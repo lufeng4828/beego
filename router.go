@@ -383,17 +383,16 @@ func (p *ControllerRegister) AddAutoPrefix(prefix string, c ControllerInterface)
 	reflectVal := reflect.ValueOf(c)
 	rt := reflectVal.Type()
 	ct := reflect.Indirect(reflectVal).Type()
-	controllerName := strings.TrimSuffix(ct.Name(), "Controller")
 	for i := 0; i < rt.NumMethod(); i++ {
 		if !utils.InSlice(rt.Method(i).Name, exceptMethod) {
 			route := &controllerInfo{}
 			route.routerType = routerTypeBeego
 			route.methods = map[string]string{"*": rt.Method(i).Name}
 			route.controllerType = ct
-			pattern := path.Join(prefix, strings.ToLower(controllerName), strings.ToLower(rt.Method(i).Name), "*")
-			patternInit := path.Join(prefix, controllerName, rt.Method(i).Name, "*")
-			patternFix := path.Join(prefix, strings.ToLower(controllerName), strings.ToLower(rt.Method(i).Name))
-			patternFixInit := path.Join(prefix, controllerName, rt.Method(i).Name)
+			pattern := path.Join(prefix, strings.ToLower(rt.Method(i).Name), "*")
+			patternInit := path.Join(prefix, rt.Method(i).Name, "*")
+			patternFix := path.Join(prefix, strings.ToLower(rt.Method(i).Name))
+			patternFixInit := path.Join(prefix, rt.Method(i).Name)
 			route.pattern = pattern
 			for _, m := range HTTPMETHOD {
 				p.addToRouter(m, pattern, route)

@@ -129,9 +129,9 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	appConfigPath = filepath.Join(workPath, "conf", "app.conf")
+	appConfigPath = filepath.Join(workPath, "app", "app.conf")
 	if !utils.FileExists(appConfigPath) {
-		appConfigPath = filepath.Join(AppPath, "conf", "app.conf")
+		appConfigPath = filepath.Join(AppPath, "app", "app.conf")
 		if !utils.FileExists(appConfigPath) {
 			AppConfig = &beegoAppConfig{innerConfig: config.NewFakeConfig()}
 			return

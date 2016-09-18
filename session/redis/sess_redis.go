@@ -37,10 +37,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
 	"github.com/astaxie/beego/session"
-
 	"github.com/garyburd/redigo/redis"
+	"fmt"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 var redispder = &Provider{}
@@ -98,7 +98,7 @@ func (rs *SessionStore) SessionID() string {
 
 // SessionRelease save session values to redis
 func (rs *SessionStore) SessionRelease(w http.ResponseWriter) {
-	b, err := session.EncodeGob(rs.values)
+	b, err := msgpack.Marshal(rs.values)
 	if err != nil {
 		return
 	}
@@ -114,6 +114,7 @@ type Provider struct {
 	poolsize    int
 	password    string
 	dbNum       int
+	keyPrefix   string
 	poollist    *redis.Pool
 }
 
@@ -123,6 +124,7 @@ type Provider struct {
 func (rp *Provider) SessionInit(maxlifetime int64, savePath string) error {
 	rp.maxlifetime = maxlifetime
 	configs := strings.Split(savePath, ",")
+	rp.keyPrefix = "SESSION:"
 	if len(configs) > 0 {
 		rp.savePath = configs[0]
 	}
@@ -171,22 +173,30 @@ func (rp *Provider) SessionInit(maxlifetime int64, savePath string) error {
 	return rp.poollist.Get().Err()
 }
 
+func (rp *Provider) FixSid(sid string) string {
+	sids := strings.Split(sid, ".")
+	if len(sids) == 2 {
+		sid = sids[0]
+	}
+	sid = fmt.Sprintf("%s%s", rp.keyPrefix,sid)
+	return sid
+}
+
 // SessionRead read redis session by sid
 func (rp *Provider) SessionRead(sid string) (session.Store, error) {
 	c := rp.poollist.Get()
 	defer c.Close()
-
+	sid = rp.FixSid(sid)
 	kvs, err := redis.String(c.Do("GET", sid))
 	var kv map[interface{}]interface{}
 	if len(kvs) == 0 {
 		kv = make(map[interface{}]interface{})
 	} else {
-		kv, err = session.DecodeGob([]byte(kvs))
-		if err != nil {
+		err = msgpack.Unmarshal([]byte(kvs), &kv)
+		if err != nil{
 			return nil, err
 		}
 	}
-
 	rs := &SessionStore{p: rp.poollist, sid: sid, values: kv, maxlifetime: rp.maxlifetime}
 	return rs, nil
 }
@@ -195,7 +205,7 @@ func (rp *Provider) SessionRead(sid string) (session.Store, error) {
 func (rp *Provider) SessionExist(sid string) bool {
 	c := rp.poollist.Get()
 	defer c.Close()
-
+	sid = rp.FixSid(sid)
 	if existed, err := redis.Int(c.Do("EXISTS", sid)); err != nil || existed == 0 {
 		return false
 	}
@@ -206,7 +216,8 @@ func (rp *Provider) SessionExist(sid string) bool {
 func (rp *Provider) SessionRegenerate(oldsid, sid string) (session.Store, error) {
 	c := rp.poollist.Get()
 	defer c.Close()
-
+	sid = rp.FixSid(sid)
+	oldsid = rp.FixSid(oldsid)
 	if existed, _ := redis.Int(c.Do("EXISTS", oldsid)); existed == 0 {
 		// oldsid doesn't exists, set the new sid directly
 		// ignore error here, since if it return error
@@ -222,8 +233,8 @@ func (rp *Provider) SessionRegenerate(oldsid, sid string) (session.Store, error)
 	if len(kvs) == 0 {
 		kv = make(map[interface{}]interface{})
 	} else {
-		kv, err = session.DecodeGob([]byte(kvs))
-		if err != nil {
+		err = msgpack.Unmarshal([]byte(kvs), &kv)
+		if err != nil{
 			return nil, err
 		}
 	}
@@ -236,7 +247,7 @@ func (rp *Provider) SessionRegenerate(oldsid, sid string) (session.Store, error)
 func (rp *Provider) SessionDestroy(sid string) error {
 	c := rp.poollist.Get()
 	defer c.Close()
-
+	sid = rp.FixSid(sid)
 	c.Do("DEL", sid)
 	return nil
 }
