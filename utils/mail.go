@@ -29,9 +29,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
+	"crypto/tls"
+	"net"
 )
 
 const (
@@ -48,6 +49,7 @@ type Email struct {
 	Password    string `json:"password"`
 	Host        string `json:"host"`
 	Port        int    `json:"port"`
+	Ssl         bool   `json:"ssl"`
 	From        string `json:"from"`
 	To          []string
 	Bcc         []string
@@ -219,19 +221,40 @@ func (e *Email) Attach(r io.Reader, filename string, args ...string) (a *Attachm
 	return at, nil
 }
 
+
+func Dial(addr string, ssl bool) (*smtp.Client, error){
+	host, _, _ := net.SplitHostPort(addr)
+	tlsconfig := &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         host,
+	}
+	var conn net.Conn
+	var err error
+	if ssl {
+		conn, err = tls.Dial("tcp", addr, tlsconfig)
+	} else {
+		conn, err = net.Dial("tcp", addr)
+	}
+
+	cli, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return cli, err
+	}
+	return cli, err
+}
+
 // Send will send out the mail
 func (e *Email) Send() error {
 	if e.Auth == nil {
 		e.Auth = smtp.PlainAuth(e.Identity, e.Username, e.Password, e.Host)
 	}
-	// Merge the To, Cc, and Bcc fields
-	to := make([]string, 0, len(e.To)+len(e.Cc)+len(e.Bcc))
+
+	to := make([]string, 0, len(e.To) + len(e.Cc) + len(e.Bcc))
 	to = append(append(append(to, e.To...), e.Cc...), e.Bcc...)
-	// Check to make sure there is at least one recipient and one "From" address
+
 	if len(to) == 0 {
 		return errors.New("Must specify at least one To address")
 	}
-
 	from, err := mail.ParseAddress(e.Username)
 	if err != nil {
 		return err
@@ -240,14 +263,52 @@ func (e *Email) Send() error {
 	if len(e.From) == 0 {
 		e.From = e.Username
 	}
-	// use mail's RFC 2047 to encode any string
+
 	e.Subject = qEncode("utf-8", e.Subject)
 
 	raw, err := e.Bytes()
 	if err != nil {
 		return err
 	}
-	return smtp.SendMail(e.Host+":"+strconv.Itoa(e.Port), e.Auth, from.Address, to, raw)
+
+	url := fmt.Sprintf("%s:%d", e.Host, e.Port)
+	c, err := Dial(url, e.Ssl)
+	if err != nil {
+		return err
+	}
+
+	if err = c.Auth(e.Auth); err != nil {
+		return err
+	}
+
+	if err = c.Mail(from.Address); err != nil {
+		return err
+	}
+
+	for _, addr := range to {
+		if(addr == ""){
+			continue
+		}
+		fmt.Println(addr)
+		if err = c.Rcpt(addr); err != nil {
+			return err
+		}
+	}
+
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(raw)
+	if err != nil {
+		return err
+	}
+
+	err = w.Close()
+	if err != nil {
+		return err
+	}
+	return c.Quit()
 }
 
 // quotePrintEncode writes the quoted-printable text to the IO Writer (according to RFC 2045)
@@ -275,7 +336,7 @@ func quotePrintEncode(w io.Writer, s string) error {
 
 		// Add a soft line break if the next (encoded) byte would push this line
 		// to or past the limit.
-		if mc+len(nextOut) >= maxLineLength {
+		if mc + len(nextOut) >= maxLineLength {
 			if _, err := io.WriteString(w, "=\r\n"); err != nil {
 				return err
 			}
@@ -304,7 +365,7 @@ func isPrintable(c byte) bool {
 func qpEscape(dest []byte, c byte) {
 	const nums = "0123456789ABCDEF"
 	dest[0] = '='
-	dest[1] = nums[(c&0xf0)>>4]
+	dest[1] = nums[(c & 0xf0) >> 4]
 	dest[2] = nums[(c & 0xf)]
 }
 
@@ -390,8 +451,8 @@ func encodeWord(charset, s string) string {
 			buf.WriteByte(b)
 		default:
 			enc[0] = '='
-			enc[1] = upperhex[b>>4]
-			enc[2] = upperhex[b&0x0f]
+			enc[1] = upperhex[b >> 4]
+			enc[2] = upperhex[b & 0x0f]
 			buf.Write(enc)
 		}
 	}
