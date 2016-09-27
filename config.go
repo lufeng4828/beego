@@ -21,10 +21,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/astaxie/beego/config"
-	"github.com/astaxie/beego/logs"
-	"github.com/astaxie/beego/session"
-	"github.com/astaxie/beego/utils"
+	"github.com/lufeng4828/beego/config"
+	"github.com/lufeng4828/beego/logs"
+	"github.com/lufeng4828/beego/session"
+	"github.com/lufeng4828/beego/utils"
 )
 
 // Config is the main struct for BConfig
@@ -223,7 +223,6 @@ func assignConfig(ac config.Configer) error {
 	} else if runMode := ac.String("RunMode"); runMode != "" {
 		BConfig.RunMode = runMode
 	}
-
 	for _, i := range []interface{}{BConfig, &BConfig.Listen, &BConfig.WebConfig, &BConfig.Log, &BConfig.WebConfig.Session} {
 		assignSingleConfig(i, ac)
 	}
@@ -365,6 +364,7 @@ func (b *beegoAppConfig) Strings(key string) []string {
 }
 
 func (b *beegoAppConfig) Int(key string) (int, error) {
+
 	if v, err := b.innerConfig.Int(BConfig.RunMode + "::" + key); err == nil {
 		return v, nil
 	}

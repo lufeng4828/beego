@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/astaxie/beego/logs"
+	"github.com/lufeng4828/beego/logs"
 	"github.com/belogik/goes"
 )
 

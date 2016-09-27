@@ -20,8 +20,8 @@
 //
 // Usage:
 // import(
-//   _ "github.com/astaxie/beego/session/redis"
-//   "github.com/astaxie/beego/session"
+//   _ "github.com/lufeng4828/beego/session/redis"
+//   "github.com/lufeng4828/beego/session"
 // )
 //
 //	func init() {
@@ -37,7 +37,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"github.com/astaxie/beego/session"
+	"github.com/lufeng4828/beego/session"
 	"github.com/garyburd/redigo/redis"
 	"fmt"
 	"gopkg.in/vmihailenco/msgpack.v2"
