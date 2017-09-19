@@ -90,6 +90,6 @@ func TestBeegoInit(ap string) {
 	if err := LoadAppConfig(appConfigProvider, appConfigPath); err != nil {
 		panic(err)
 	}
-	BConfig.RunMode = "test"
+	BConfig.RunMode = "Development"
 	initBeforeHTTPRun()
 }
