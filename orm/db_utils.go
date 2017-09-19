@@ -41,8 +41,6 @@ func getExistPk(mi *modelInfo, ind reflect.Value) (column string, value interfac
 		vu := v.Int()
 		exist = true
 		value = vu
-	} else if fi.fieldType&IsRelField > 0 {
-		_, value, exist = getExistPk(fi.relModelInfo, reflect.Indirect(v))
 	} else {
 		vu := v.String()
 		exist = vu != ""
@@ -147,18 +145,16 @@ outFor:
 			if v, ok := arg.(time.Time); ok {
 				if fi != nil && fi.fieldType == TypeDateField {
 					arg = v.In(tz).Format(formatDate)
-				} else if fi != nil && fi.fieldType == TypeDateTimeField {
+				} else if fi.fieldType == TypeDateTimeField {
 					arg = v.In(tz).Format(formatDateTime)
-				} else if fi != nil && fi.fieldType == TypeTimeField {
-					arg = v.In(tz).Format(formatTime)
 				} else {
-					arg = v.In(tz).Format(formatDateTime)
+					arg = v.In(tz).Format(formatTime)
 				}
 			} else {
 				typ := val.Type()
 				name := getFullName(typ)
 				var value interface{}
-				if mmi, ok := modelCache.getByFullName(name); ok {
+				if mmi, ok := modelCache.getByFN(name); ok {
 					if _, vu, exist := getExistPk(mmi, val); exist {
 						value = vu
 					}
